@@ -21,25 +21,24 @@ pub struct ApiResult {
 }
 
 pub struct ApiClient {
-    base_url: Url,
+    request_url: Url,
     http_client: Client,
-    auth_email: String,
+    auth_email: Secret<String>,
     auth_key: Secret<String>,
 }
 
 impl ApiClient {
     pub fn new(
-        base_url: String,
-        auth_email: String,
-        auth_key: String,
+        request_url: String,
+        auth_email: Secret<String>,
+        auth_key: Secret<String>,
         timeout: std::time::Duration,
     ) -> Result<Self, ParseError> {
         let http_client = Client::builder().timeout(timeout).build().unwrap();
-        let base_url = Url::parse(&base_url)?;
-        let auth_key = Secret::new(auth_key);
+        let request_url = Url::parse(&request_url)?;
         Ok(Self {
+            request_url,
             http_client,
-            base_url,
             auth_email,
             auth_key,
         })
@@ -48,13 +47,13 @@ impl ApiClient {
     pub async fn get_dns_record(&self, record_id: &str) -> Result<ApiResponse, Error> {
         // doc: https://api.cloudflare.com/#dns-records-for-a-zone-dns-record-details
         // implement api query here
-        let url = self.base_url.join(record_id).unwrap();
+        let url = self.request_url.join(record_id).unwrap();
 
         println!("Request URL: {}", url);
         let response = self
             .http_client
             .get(url)
-            .header("X-Auth-Email", &self.auth_email)
+            .header("X-Auth-Email", self.auth_email.expose_secret())
             .header("X-Auth-Key", self.auth_key.expose_secret())
             .header("Content-Type", "application/json")
             .send()
@@ -75,7 +74,7 @@ impl ApiClient {
     ) -> Result<(), Error> {
         // doc: https://api.cloudflare.com/#dns-records-for-a-zone-update-dns-record
         // implement api update here
-        let url = self.base_url.join(record_id).unwrap();
+        let url = self.request_url.join(record_id).unwrap();
 
         println!("Request URL: {}", url);
         let request_body = serde_json::json!({
@@ -89,7 +88,7 @@ impl ApiClient {
         let response = self
             .http_client
             .put(url)
-            .header("X-Auth-Email", &self.auth_email)
+            .header("X-Auth-Email", self.auth_email.expose_secret())
             .header("X-Auth-Key", self.auth_key.expose_secret())
             .header("Content-Type", "application/json")
             .json(&request_body)
@@ -155,4 +154,26 @@ pub async fn get_current_ipv6_addr(
 
     let addr_info = interface_info_vec[0].addr_info.to_owned();
     Ok(addr_info)
+}
+
+#[derive(serde::Deserialize, Debug)]
+pub struct Settings {
+    pub base_url: String,
+    pub zone_id: String,
+    pub dns_id: String,
+    pub auth_email: Secret<String>,
+    pub auth_key: Secret<String>,
+}
+
+pub fn load_config() -> Result<Settings, config::ConfigError> {
+    // Initialize config reader
+    // let config_path = std::path::PathBuf::from(r"/etc/cf_ddns");
+    let config_path = std::env::current_dir().expect("Failed to determine current directory");
+    let settings = config::Config::builder()
+        .add_source(config::File::from(config_path.join("config")))
+        .build()
+        .unwrap();
+
+    // settings.merge(config::File::from(base_path.join("config")).required(true))?;
+    settings.try_deserialize::<Settings>()
 }

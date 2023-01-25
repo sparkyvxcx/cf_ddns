@@ -1,23 +1,20 @@
 use cf_ddns::{get_current_ipv6_addr, ApiClient};
 
-const BASE_URL: &'static str = "https://api.cloudflare.com/client/v4/zones";
-const ZONE_ID: &'static str = "023e105f4ecef8ad9ca31a8372d0c353";
-const DNS_ID: &str = "372e67954025e0ba6aaa6d586b9e0b59";
-const AUTH_EMAIL: &'static str = "user@example.com";
-const AUTH_KEY: &'static str = "c2547eb745079dac9320b638f5e225cf483cc5cfdda41";
-
 #[tokio::main]
 async fn main() {
-    let base_url = format!("{}/{}/dns_records/", BASE_URL, ZONE_ID);
+    let settings = cf_ddns::load_config().expect("Failed to read config");
+    println!("{:#?}", settings);
+
+    let request_url = format!("{}/{}/dns_records/", settings.base_url, settings.zone_id);
     let my_client = ApiClient::new(
-        base_url,
-        AUTH_EMAIL.to_string(),
-        AUTH_KEY.to_string(),
+        request_url,
+        settings.auth_email,
+        settings.auth_key,
         std::time::Duration::from_secs(30),
     )
     .unwrap();
 
-    let response = my_client.get_dns_record(DNS_ID).await.unwrap();
+    let response = my_client.get_dns_record(&settings.dns_id).await.unwrap();
     println!(
         "{}'s current AAAA record: {}",
         response.result.name, response.result.content
