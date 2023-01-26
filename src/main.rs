@@ -6,7 +6,7 @@ use std::time::Duration;
 #[tokio::main]
 async fn main() {
     let settings = load_config().expect("Failed to read config");
-    println!("{:#?}", settings);
+    // println!("{:#?}", settings);
 
     let request_url = format!(
         "{}/{}/dns_records/",
@@ -19,23 +19,6 @@ async fn main() {
         std::time::Duration::from_secs(30),
     )
     .unwrap();
-
-    /*
-    let response = my_client
-        .get_dns_record(&settings.cf_api_v4.dns_id)
-        .await
-        .unwrap();
-    println!(
-        "{}'s current AAAA record: {}",
-        response.result.name, response.result.content
-    );
-
-    let addr_info = get_current_ipv6_addr(&settings.interface.name)
-        .await
-        .unwrap();
-
-    println!("{:#?}", addr_info);
-    */
 
     if let Err(e) = worker_loop(
         settings.cf_api_v4.dns_id,
@@ -60,38 +43,69 @@ async fn worker_loop(
     let curr_record_domain = curr_record.result.name;
     let mut curr_record_content = curr_record.result.content;
 
+    println!("Fetching initial AAAA record from Cloudflare API succeed!");
+    println!(
+        "Starting to monitoring {}'s global ipv6 address change",
+        interface_name
+    );
+
     loop {
         let current_ipv6_addresses = get_current_ipv6_addr(&interface_name)
             .await?
             .iter()
-            .map(|addr| format!("[{}]:{}", addr.local, wireguard_port))
+            .map(|addr| addr.local.clone())
             .collect();
-        let active_ipv6_addr = get_active_ipv6_addr(current_ipv6_addresses)
+
+        println!(
+            "  {}'s AAAA record currently pointing to: {}",
+            curr_record_domain, curr_record_content
+        );
+
+        let active_ipv6_addr = get_active_ipv6_addr(current_ipv6_addresses, wireguard_port)
             .await
             .expect(&format!(
                 "Failed to find a active ipv6 address on interface: {}",
                 interface_name
             ));
 
+        println!(
+            "  {}'s active ipv6 address: {}",
+            interface_name, active_ipv6_addr
+        );
+
         if active_ipv6_addr != curr_record_content {
             // TODO: update the dns record
-            api_clt
+            println!(
+                "  {}'s ipv6 address changed, updating dns record...",
+                interface_name
+            );
+            match api_clt
                 .set_dns_record(&dns_id, "AAAA", &curr_record_domain, &active_ipv6_addr)
                 .await
-                .unwrap();
-
-            curr_record_content = active_ipv6_addr;
+            {
+                Ok(_) => {
+                    println!("  update AAAA record through Cloudflare API succeed!");
+                    curr_record_content = active_ipv6_addr;
+                }
+                Err(e) => {
+                    println!("  {}", e);
+                    println!("  sleeping 15s...");
+                    tokio::time::sleep(Duration::from_secs(15)).await;
+                    continue;
+                }
+            }
         } else {
             tokio::time::sleep(Duration::from_secs(10)).await;
         }
     }
 }
 
-async fn get_active_ipv6_addr(addr_list: Vec<String>) -> Option<String> {
+async fn get_active_ipv6_addr(addr_list: Vec<String>, port: u16) -> Option<String> {
     for addr in addr_list {
         // TODO: test connectivity of each ipv6 address
         // let target_addr = Ipv6Addr::from_str(&addr.local).unwrap();
-        if is_reachable(&addr).await {
+        let wg_server = format!("[{}]:{}", addr, port);
+        if is_reachable(&wg_server).await {
             return Some(addr);
         }
     }

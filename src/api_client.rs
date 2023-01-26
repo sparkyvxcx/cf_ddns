@@ -95,8 +95,10 @@ impl ApiClient {
             .await?;
         // parse json response to struct here
         // let response_json: ApiResponse = response.json().await?;
-        let response_text = response.text().await?;
-        println!("{:?}", response_text);
+        // let response_text = response.text().await?;
+        // println!("{:?}", response_text);
+        let response_json: ApiResponse = response.json().await?;
+        println!("{:#?}", response_json);
 
         Ok(())
     }
