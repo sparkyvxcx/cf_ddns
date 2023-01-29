@@ -1,7 +1,10 @@
 use cf_ddns::api_client::ApiClient;
 use cf_ddns::configuration::load_config;
 use cf_ddns::utils::get_current_ipv6_addr;
+use colored::*;
+use std::net::SocketAddr;
 use std::time::Duration;
+use tokio::net::UdpSocket;
 
 #[tokio::main]
 async fn main() {
@@ -45,8 +48,8 @@ async fn worker_loop(
 
     println!("Fetching initial AAAA record from Cloudflare API succeed!");
     println!(
-        "Starting to monitoring {}'s global ipv6 address change",
-        interface_name
+        "Starting to monitoring any global ipv6 address change on interface: {}",
+        interface_name.green()
     );
 
     loop {
@@ -58,32 +61,35 @@ async fn worker_loop(
 
         println!(
             "  {}'s AAAA record currently pointing to: {}",
-            curr_record_domain, curr_record_content
+            curr_record_domain.white(),
+            curr_record_content.blue()
         );
 
         let active_ipv6_addr = get_active_ipv6_addr(current_ipv6_addresses, wireguard_port)
             .await
             .expect(&format!(
                 "Failed to find a active ipv6 address on interface: {}",
-                interface_name
+                interface_name.red()
             ));
 
         println!(
             "  {}'s active ipv6 address: {}",
-            interface_name, active_ipv6_addr
+            interface_name.green(),
+            active_ipv6_addr.blue()
         );
 
         if active_ipv6_addr != curr_record_content {
             // TODO: update the dns record
             println!(
                 "  {}'s ipv6 address changed, updating dns record...",
-                interface_name
+                interface_name.green()
             );
             match api_clt
                 .set_dns_record(&dns_id, "AAAA", &curr_record_domain, &active_ipv6_addr)
                 .await
             {
                 Ok(_) => {
+                    // TODO: send notification through telegram bot webhook, upon successful AAAA record update
                     println!("  update AAAA record through Cloudflare API succeed!");
                     curr_record_content = active_ipv6_addr;
                 }
@@ -112,9 +118,11 @@ async fn get_active_ipv6_addr(addr_list: Vec<String>, port: u16) -> Option<Strin
     None
 }
 
-use std::net::UdpSocket;
+async fn is_reachable(remote_addr: &str) -> bool {
+    let remote_addr = remote_addr.parse::<SocketAddr>().unwrap();
+    let sock = UdpSocket::bind("[::1]:0".parse::<SocketAddr>().unwrap())
+        .await
+        .expect("Failed to bind to address");
 
-async fn is_reachable(target: &str) -> bool {
-    let socket = UdpSocket::bind("[::1]:0").expect("Failed to bind to address");
-    return socket.connect(target).is_ok();
+    sock.connect(remote_addr).await.is_ok()
 }
