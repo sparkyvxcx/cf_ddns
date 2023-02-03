@@ -1,6 +1,6 @@
 use cf_ddns::api_client::ApiClient;
 use cf_ddns::configuration::load_config;
-use cf_ddns::utils::get_current_ipv6_addr;
+use cf_ddns::utils::{get_args, get_current_ipv6_addr};
 use colored::*;
 use std::net::SocketAddr;
 use std::time::Duration;
@@ -8,7 +8,9 @@ use tokio::net::UdpSocket;
 
 #[tokio::main]
 async fn main() {
-    let settings = load_config().expect("Failed to read config");
+    let config_file = get_args().unwrap();
+    let settings = load_config(&config_file).expect("Failed to read config");
+
     // println!("{:#?}", settings);
 
     let request_url = format!(
@@ -61,7 +63,7 @@ async fn worker_loop(
 
         println!(
             "  {}'s AAAA record currently pointing to: {}",
-            curr_record_domain.white(),
+            curr_record_domain.yellow(),
             curr_record_content.blue()
         );
 

@@ -28,12 +28,12 @@ pub struct WireguardSettings {
     pub port: u16,
 }
 
-pub fn load_config() -> Result<Settings, config::ConfigError> {
+pub fn load_config(filename: &str) -> Result<Settings, config::ConfigError> {
     // Initialize config reader
     // let config_path = std::path::PathBuf::from(r"/etc/cf_ddns");
     let config_path = std::env::current_dir().expect("Failed to determine current directory");
     let settings = config::Config::builder()
-        .add_source(config::File::from(config_path.join("config")))
+        .add_source(config::File::from(config_path.join(filename)))
         .build()
         .unwrap();
 

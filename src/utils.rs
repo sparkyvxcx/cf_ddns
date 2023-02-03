@@ -1,3 +1,5 @@
+use clap::{App, Arg};
+use std::error::Error;
 use std::process::Command;
 
 #[derive(serde::Deserialize, Debug)]
@@ -24,6 +26,27 @@ pub struct AddrInfo {
     //  noprefixroute: bool,
     //  valid_life_time: usize,
     //  preferred_life_time: usize,
+}
+
+pub fn get_args() -> Result<String, Box<dyn Error>> {
+    let matches = App::new("cf_ddns")
+        .version("0.0.1")
+        .author("sparkvix <sparkvix@gmail.com>")
+        .about("Cloudflare Dynamic DNS")
+        .arg(
+            Arg::with_name("config")
+                .short("c")
+                .long("config")
+                .value_name("FILENAME")
+                .help("configuration file")
+                .takes_value(true)
+                .required(true),
+        )
+        .get_matches();
+
+    let config_path = matches.value_of("config").unwrap().to_string();
+
+    Ok(config_path)
 }
 
 pub async fn get_current_ipv6_addr(interface_name: &str) -> Result<Vec<AddrInfo>, anyhow::Error> {
