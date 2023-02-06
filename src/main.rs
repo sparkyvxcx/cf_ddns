@@ -67,12 +67,19 @@ async fn worker_loop(
             curr_record_content.blue()
         );
 
-        let active_ipv6_addr = get_active_ipv6_addr(current_ipv6_addresses, wireguard_port)
-            .await
-            .expect(&format!(
-                "Failed to find a active ipv6 address on interface: {}",
-                interface_name.red()
-            ));
+        let active_ipv6_addr =
+            match get_active_ipv6_addr(current_ipv6_addresses, wireguard_port).await {
+                Some(addr) => addr,
+                None => {
+                    println!(
+                        "Failed to find a active ipv6 address on interface: {}",
+                        interface_name.red()
+                    );
+                    println!("Waiting 30s to retry...");
+                    tokio::time::sleep(Duration::from_secs(30)).await;
+                    continue;
+                }
+            };
 
         println!(
             "  {}'s active ipv6 address: {}",
