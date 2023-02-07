@@ -69,6 +69,12 @@ pub async fn get_current_ipv6_addr(interface_name: &str) -> Result<Vec<AddrInfo>
     let interface_info_vec: Vec<InterfaceInfo> = serde_json::from_str(&cmd_result)?;
 
     // println!("{:#?}", interface_info_vec[0]);
+    if interface_info_vec.is_empty() {
+        return Err(anyhow::format_err!(
+            "Faild to find ipv6 address on interface: {}",
+            interface_name
+        ));
+    }
 
     let addr_info = interface_info_vec[0].addr_info.to_owned();
     Ok(addr_info)

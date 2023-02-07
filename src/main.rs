@@ -56,8 +56,9 @@ async fn worker_loop(
 
     loop {
         let current_ipv6_addresses = get_current_ipv6_addr(&interface_name)
-            .await?
-            .iter()
+            .await
+            .unwrap_or(vec![])
+            .into_iter()
             .map(|addr| addr.local.clone())
             .collect();
 
@@ -72,7 +73,7 @@ async fn worker_loop(
                 Some(addr) => addr,
                 None => {
                     println!(
-                        "Failed to find a active ipv6 address on interface: {}",
+                        "No global reachable ipv6 address on interface: {}",
                         interface_name.red()
                     );
                     println!("Waiting 30s to retry...");
