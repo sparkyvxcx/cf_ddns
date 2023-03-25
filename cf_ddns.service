@@ -1,0 +1,14 @@
+[Unit]
+Description=The cloudflare dynamic dns
+Documentation=https://github.com/sparkyvxcx/cf_ddns
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/cf_ddns --config /home/pi/Services/cf_ddns/config.yaml
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartForceExitStatus=SIGPIPE
+KillMode=control-group
+
+[Install]
+WantedBy=multi-user.target
