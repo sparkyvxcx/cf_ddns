@@ -1,6 +1,8 @@
-use clap::{App, Arg};
-use std::error::Error;
 use std::process::Command;
+use std::time::Duration;
+use std::{error::Error, process::Output};
+
+use clap::{App, Arg};
 
 #[derive(serde::Deserialize, Debug)]
 pub struct InterfaceInfo {
@@ -50,16 +52,27 @@ pub fn get_args() -> Result<String, Box<dyn Error>> {
 }
 
 pub async fn get_current_ipv6_addr(interface_name: &str) -> Result<Vec<AddrInfo>, anyhow::Error> {
-    let output = Command::new("ip")
-        .arg("-6")
-        .arg("-j")
-        .arg("addr")
-        .arg("show")
-        .arg("dev")
-        .arg(interface_name)
-        .output()
-        .expect("failed to execute process");
-
+    let output: Output;
+    loop {
+        match Command::new("ip")
+            .arg("-6")
+            .arg("-j")
+            .arg("addr")
+            .arg("show")
+            .arg("dev")
+            .arg(interface_name)
+            .output()
+        {
+            Ok(new_output) => {
+                output = new_output;
+                break;
+            }
+            Err(_) => {
+                println!("interface not found, retrying");
+                tokio::time::sleep(Duration::from_secs(5)).await;
+            }
+        }
+    }
     // println!("status: {}", output.status);
     // println!("stdout: {}", String::from_utf8_lossy(&output.stdout));
     // println!("stderr: {}", String::from_utf8_lossy(&output.stderr));

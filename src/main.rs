@@ -1,10 +1,12 @@
+use std::net::SocketAddr;
+use std::time::Duration;
+
+use colored::*;
+use tokio::net::UdpSocket;
+
 use cf_ddns::api_client::ApiClient;
 use cf_ddns::configuration::load_config;
 use cf_ddns::utils::{get_args, get_current_ipv6_addr};
-use colored::*;
-use std::net::SocketAddr;
-use std::time::Duration;
-use tokio::net::UdpSocket;
 
 #[tokio::main]
 async fn main() {
@@ -35,7 +37,7 @@ async fn main() {
     {
         eprintln!("{}", e);
         std::process::exit(1);
-    }
+    };
 }
 
 async fn worker_loop(
@@ -44,9 +46,26 @@ async fn worker_loop(
     wireguard_port: u16,
     api_clt: ApiClient,
 ) -> Result<(), anyhow::Error> {
-    let curr_record = api_clt.get_dns_record(&dns_id).await?;
-    let curr_record_domain = curr_record.result.name;
-    let mut curr_record_content = curr_record.result.content;
+    let mut curr_record_domain = String::new();
+    let mut curr_record_content = String::new();
+    for retry in 1..10 {
+        match api_clt.get_dns_record(&dns_id).await {
+            Ok(record) => {
+                curr_record_domain = record.result.name;
+                curr_record_content = record.result.content;
+            }
+            Err(_) => {
+                println!("fetch record failed, sleep 5s, retries count: {}", retry);
+                tokio::time::sleep(Duration::from_secs(5)).await;
+
+                if retry == 10 {
+                    return Err(anyhow::anyhow!(
+                        "failed to fetch record from Cloudflare, retries run out"
+                    ));
+                }
+            }
+        };
+    }
 
     println!("Fetching initial AAAA record from Cloudflare API succeed!");
     println!(
