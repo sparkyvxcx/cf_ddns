@@ -18,3 +18,26 @@ jobs:
           use-cross: true
           command: build
           args: --target armv7-unknown-linux-gnueabihf
+  build_for_pi:
+    name: Raspberry Pi
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@master
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: armv7-unknown-linux-gnueabihf
+          override: true
+      - uses: actions-rs/cargo@v1
+        with:
+          use-cross: true
+          command: build
+          args: --release --target armv7-unknown-linux-gnueabihf
+      - name: Rename binary
+        run: mv target/armv7-unknown-linux-gnueabihf/release/cf_ddns cf_ddns-armv7-pi
+      - name: Upload to release
+        uses: JasonEtco/upload-to-release@d648f1babf776de9cad881320bd9e9818fc3b262
+        with:
+          args: cf_ddns-armv7-pi application/octet-stream
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
