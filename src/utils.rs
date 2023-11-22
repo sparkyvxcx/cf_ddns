@@ -32,7 +32,7 @@ pub struct AddrInfo {
 
 pub fn get_args() -> Result<String, Box<dyn Error>> {
     let matches = App::new("cf_ddns")
-        .version("0.0.1")
+        .version("0.1.0")
         .author("sparkvix <sparkvix@gmail.com>")
         .about("Cloudflare Dynamic DNS")
         .arg(
