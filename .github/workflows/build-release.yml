@@ -1,10 +1,37 @@
 name: Build Binaries
 on: 
-  release:
-    types: # This configuration does not affect the page_build event above
-      - created
+  push:
+    tags:
+      - "v*.*.*"
 
 jobs:
+  build_for_mac:
+    name: MacOS
+    runs-on: macos-10.15
+    steps:
+      - uses: actions/checkout@master
+      - uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release
+      - name: Rename binary
+        run: mv target/release/cf_ddns cf_ddns-macos64
+      - name: Release
+        uses: softprops/action-gh-release@v1
+      - name: Upload to release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          curl \
+            -f \
+            -sSL \
+            -XPOST \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Content-Length: $(stat -f%z cf_ddns-macos64)" \
+            -H "Content-Type: application/octet-stream" \
+            --upload-file "cf_ddns-macos64" \
+            "https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases/$(jq --raw-output '.release.id' $GITHUB_EVENT_PATH)/assets?name=cf_ddns-macos64"
+
   build_for_pi:
     name: Raspberry Pi
 
@@ -24,6 +51,8 @@ jobs:
           args: --release --target armv7-unknown-linux-gnueabihf
       - name: Rename binary
         run: mv target/armv7-unknown-linux-gnueabihf/release/cf_ddns cf_ddns-armv7-pi
+      - name: Release
+        uses: softprops/action-gh-release@v1
       - name: Upload to release
         uses: JasonEtco/upload-to-release@master
         with:
